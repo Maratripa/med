@@ -1,6 +1,9 @@
 use crossterm::{
     cursor,
-    event::{self, Event, KeyEvent},
+    event::{
+        self, Event, KeyEvent, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
+        PushKeyboardEnhancementFlags,
+    },
     execute, queue,
     style::{self, Color, Print},
     terminal,
@@ -37,7 +40,11 @@ impl Terminal {
     }
 
     pub fn setup(&mut self) -> Result<()> {
-        execute!(self.stdout, terminal::EnterAlternateScreen)?;
+        execute!(
+            self.stdout,
+            terminal::EnterAlternateScreen,
+            PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+        )?;
         terminal::enable_raw_mode()?;
         self.clear_screen()?;
         self.move_cursor(0, 0)?;
@@ -46,7 +53,11 @@ impl Terminal {
 
     pub fn restore(&mut self) -> Result<()> {
         terminal::disable_raw_mode()?;
-        execute!(self.stdout, terminal::LeaveAlternateScreen)?;
+        execute!(
+            self.stdout,
+            PopKeyboardEnhancementFlags,
+            terminal::LeaveAlternateScreen
+        )?;
         Ok(())
     }
 
