@@ -1,0 +1,11 @@
+[package]
+name = "med"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.97"
+crossterm = { version = "0.28.1", features = ["event-stream"] }
+ropey = "1.6.1"
+tokio = { version = "1.44.0", features = ["macros", "rt", "rt-multi-thread"] }
+tokio-stream = "0.1.17"
