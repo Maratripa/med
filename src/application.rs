@@ -1,11 +1,17 @@
 use anyhow::Result;
 use crossterm::event::{Event, EventStream};
 
+use std::io::Write;
+
 use tokio::select;
 use tokio_stream::StreamExt;
 
 use crate::{
-    document::Document, editor::Editor, renderer::Renderer, terminal::Terminal, view::View,
+    document::Document,
+    editor::Editor,
+    renderer::Renderer,
+    terminal::{Size, Terminal},
+    view::View,
 };
 
 pub struct Application {
@@ -26,7 +32,10 @@ impl Application {
             }
         }
 
-        view.resize(*terminal.size());
+        let mut terminal_size = *terminal.size();
+        terminal_size.height -= 1; // Remove a line for statusline
+
+        view.resize(terminal_size);
 
         Self {
             terminal,
@@ -60,11 +69,11 @@ impl Application {
         let event = event.expect("Couldn't unwarp Event");
 
         let should_render = match event {
-            Event::Resize(w, h) => true,
-            Event::Key(key_event) => {
-                self.editor.set_should_quit();
-                false
+            Event::Resize(w, h) => {
+                self.resize(w, h);
+                true
             }
+            Event::Key(key_event) => self.editor.handle_key(&mut self.terminal, key_event),
             _ => false,
         };
 
@@ -76,12 +85,22 @@ impl Application {
     fn render(&mut self) {
         self.renderer
             .render(&self.view, self.editor.document(), &mut self.terminal);
+
+        let (x, y) = self.editor.cursor().get_position_as_tuple();
+        self.terminal.move_cursor(x as u16, y as u16).unwrap();
+        self.terminal.flush().unwrap();
+    }
+
+    fn resize(&mut self, w: u16, h: u16) {
+        self.view.resize(Size {
+            width: w,
+            height: h - 1, // Remove a line for statusline
+        });
     }
 
     pub async fn run(&mut self) -> Result<()> {
         self.terminal.setup()?;
 
-        let _ = Terminal::read_key()?;
         // self.event_loop().await?;
         //
         self.render();

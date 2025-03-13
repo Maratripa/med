@@ -5,6 +5,7 @@ use anyhow::Result;
 
 mod application;
 use application::Application;
+mod cursor;
 mod document;
 mod editor;
 mod renderer;

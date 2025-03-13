@@ -8,6 +8,8 @@ impl Renderer {
     }
 
     pub fn render(&self, view: &View, doc: &Document, term: &mut Terminal) {
+        term.move_cursor(0, 0).unwrap();
+
         let view_size = view.size();
         let (view_height, view_width) = (view_size.height as usize, view_size.width as usize);
 
