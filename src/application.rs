@@ -1,15 +1,12 @@
 use anyhow::Result;
 use crossterm::event::{Event, EventStream};
 
-use std::io::Write;
-
 use tokio::select;
 use tokio_stream::StreamExt;
 
 use crate::{
     document::Document,
     editor::Editor,
-    renderer::Renderer,
     terminal::{Size, Terminal},
     view::View,
 };
@@ -18,7 +15,6 @@ pub struct Application {
     terminal: Terminal,
     editor: Editor,
     view: View,
-    renderer: Renderer,
 }
 
 impl Application {
@@ -41,7 +37,6 @@ impl Application {
             terminal,
             editor,
             view,
-            renderer: Renderer::new(),
         }
     }
 
@@ -73,7 +68,7 @@ impl Application {
                 self.resize(w, h);
                 true
             }
-            Event::Key(key_event) => self.editor.handle_key(&mut self.terminal, key_event),
+            Event::Key(key_event) => self.editor.handle_key(key_event),
             _ => false,
         };
 
@@ -83,11 +78,32 @@ impl Application {
     }
 
     fn render(&mut self) {
-        self.renderer
-            .render(&self.view, self.editor.document(), &mut self.terminal);
+        self.view.adjust_offset(&self.editor.cursor());
+        let view_size = self.view.size();
+        let (view_height, view_width) = (view_size.height as usize, view_size.width as usize);
+
+        let lines_iter = self
+            .editor
+            .document()
+            .text()
+            .lines()
+            .skip(self.view.dy)
+            .take(view_height);
+
+        self.terminal.clear_screen().unwrap();
+        for (row, line) in lines_iter.enumerate() {
+            self.terminal.move_cursor(0, row as u16).unwrap();
+
+            let mut line_str = line.clone().to_string();
+            line_str.truncate(view_width);
+
+            self.terminal.write(&line_str).unwrap();
+        }
 
         let (x, y) = self.editor.cursor().get_position_as_tuple();
-        self.terminal.move_cursor(x as u16, y as u16).unwrap();
+        self.terminal
+            .move_cursor((x - self.view.dx) as u16, (y - self.view.dy) as u16)
+            .unwrap();
         self.terminal.flush().unwrap();
     }
 

@@ -8,7 +8,6 @@ use application::Application;
 mod cursor;
 mod document;
 mod editor;
-mod renderer;
 mod terminal;
 use terminal::Terminal;
 mod view;

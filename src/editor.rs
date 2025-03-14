@@ -1,8 +1,6 @@
-use std::io::Write;
-
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::{cursor::Cursor, document::Document, terminal::Terminal};
+use crate::{cursor::Cursor, document::Document};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Mode {
@@ -47,7 +45,7 @@ impl Editor {
         &self.cursor
     }
 
-    pub fn handle_key(&mut self, terminal: &mut Terminal, key_event: KeyEvent) -> bool {
+    pub fn handle_key(&mut self, key_event: KeyEvent) -> bool {
         // let mut log = std::fs::OpenOptions::new()
         //     .write(true)
         //     .append(true)
@@ -69,17 +67,16 @@ impl Editor {
                 self.mode = Mode::Insert;
                 false
             }
-            (KeyCode::Char(c), _, Mode::Insert) => true,
+            (KeyCode::Char(_c), _, Mode::Insert) => true,
             (KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down, _, _) => {
-                self.move_cursor(terminal, key_event.code);
-                false
+                self.move_cursor(key_event.code);
+                true
             }
             _ => false,
         }
     }
 
-    fn move_cursor(&mut self, terminal: &mut Terminal, key_code: KeyCode) {
-        let mut update = false;
+    fn move_cursor(&mut self, key_code: KeyCode) {
         match key_code {
             KeyCode::Right => {
                 let line_width = if let Some(line) = self.document().text().get_line(self.cursor.y)
@@ -96,6 +93,8 @@ impl Editor {
                     self.cursor.y += 1;
                     self.cursor.x = 0;
                 }
+
+                return;
             }
             KeyCode::Left => {
                 if self.cursor.x == 0 {
@@ -104,9 +103,9 @@ impl Editor {
                     }
                     self.cursor.y -= 1;
                     self.cursor.x = usize::MAX;
-                    update = true;
                 } else {
                     self.cursor.x -= 1;
+                    return;
                 }
             }
             KeyCode::Up => {
@@ -115,30 +114,23 @@ impl Editor {
                 }
 
                 self.cursor.y -= 1;
-                update = true;
             }
             KeyCode::Down => {
                 // - 1 because the rope adds a line at the end (?)  --v
                 if self.cursor.y < self.document().text().len_lines() - 1 {
                     self.cursor.y += 1;
-                    update = true;
+                } else {
+                    return;
                 }
             }
             _ => unreachable!(),
         }
 
-        if update {
-            if let Some(line) = self.document().text().get_line(self.cursor.y) {
-                // saturating_sub(1) is because the line counts the newline in the width
-                self.cursor.x = std::cmp::min(line.len_chars().saturating_sub(1), self.cursor.x);
-            } else {
-                self.cursor.x = 0;
-            }
+        if let Some(line) = self.document().text().get_line(self.cursor.y) {
+            // saturating_sub(1) is because the line counts the newline in the width
+            self.cursor.x = std::cmp::min(line.len_chars().saturating_sub(1), self.cursor.x);
+        } else {
+            self.cursor.x = 0;
         }
-
-        terminal
-            .move_cursor(self.cursor.x as u16, self.cursor.y as u16)
-            .unwrap();
-        terminal.flush().unwrap();
     }
 }
