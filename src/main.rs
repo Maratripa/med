@@ -9,7 +9,6 @@ mod cursor;
 mod document;
 mod editor;
 mod terminal;
-use terminal::Terminal;
 mod view;
 
 fn main() -> Result<()> {
@@ -21,9 +20,7 @@ fn main() -> Result<()> {
 async fn main_impl() -> Result<i32> {
     let args: Vec<String> = std::env::args().collect();
 
-    let terminal = Terminal::new()?;
-
-    let mut app = Application::new(args, terminal);
+    let mut app = Application::new(args);
 
     app.run().await?;
 

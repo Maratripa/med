@@ -1,7 +1,8 @@
-use crate::{cursor::Cursor, terminal::Size};
+use crate::cursor::Cursor;
 
 pub struct View {
-    size: Size,
+    width: usize,
+    height: usize,
     pub dx: usize,
     pub dy: usize,
 }
@@ -9,26 +10,29 @@ pub struct View {
 impl View {
     pub fn new() -> Self {
         Self {
-            size: Size {
-                width: 0,
-                height: 0,
-            },
+            width: 0,
+            height: 0,
             dx: 0,
             dy: 0,
         }
     }
 
-    pub fn resize(&mut self, new_size: Size) {
-        self.size = new_size;
+    pub fn resize(&mut self, new_width: usize, new_height: usize) {
+        self.width = new_width;
+        self.height = new_height;
     }
 
-    pub fn size(&self) -> Size {
-        self.size
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
     }
 
     pub fn adjust_offset(&mut self, cursor: &Cursor) {
-        if cursor.y > self.dy + self.size.height as usize {
-            self.dy = cursor.y - self.size.height as usize;
+        if cursor.y > self.dy + self.height as usize - 1 {
+            self.dy = cursor.y - self.height as usize + 1;
         } else if cursor.y < self.dy {
             self.dy = cursor.y;
         }

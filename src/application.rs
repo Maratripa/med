@@ -1,26 +1,23 @@
 use anyhow::Result;
 use crossterm::event::{Event, EventStream};
+use crossterm::style::Color;
+use std::io::stdout;
 
 use tokio::select;
 use tokio_stream::StreamExt;
 
-use crate::{
-    document::Document,
-    editor::Editor,
-    terminal::{Size, Terminal},
-    view::View,
-};
+use crate::{document::Document, editor::Editor, terminal::Terminal, view::View};
 
 pub struct Application {
     terminal: Terminal,
     editor: Editor,
     view: View,
+    statusline: String,
 }
 
 impl Application {
-    pub fn new(args: Vec<String>, terminal: Terminal) -> Self {
+    pub fn new(args: Vec<String>) -> Self {
         let mut editor = Editor::new();
-        let mut view = View::new();
 
         if args.len() > 1 {
             if let Ok(doc) = Document::new_from_path(args[1].to_owned().into()) {
@@ -28,15 +25,17 @@ impl Application {
             }
         }
 
-        let mut terminal_size = *terminal.size();
-        terminal_size.height -= 1; // Remove a line for statusline
+        let terminal =
+            Terminal::new(Box::new(stdout())).expect("Failed to initialize Terminal struct");
 
-        view.resize(terminal_size);
+        let mut view = View::new();
+        view.resize(terminal.width(), terminal.height());
 
         Self {
             terminal,
             editor,
             view,
+            statusline: String::from("Welcome to MED!"),
         }
     }
 
@@ -73,14 +72,12 @@ impl Application {
         };
 
         if should_render && !self.editor.should_quit() {
-            self.render();
+            self.render().await;
         }
     }
 
-    fn render(&mut self) {
+    async fn render(&mut self) {
         self.view.adjust_offset(&self.editor.cursor());
-        let view_size = self.view.size();
-        let (view_height, view_width) = (view_size.height as usize, view_size.width as usize);
 
         let lines_iter = self
             .editor
@@ -88,17 +85,17 @@ impl Application {
             .text()
             .lines()
             .skip(self.view.dy)
-            .take(view_height);
+            .take(self.view.height());
 
-        self.terminal.clear_screen().unwrap();
         for (row, line) in lines_iter.enumerate() {
-            self.terminal.move_cursor(0, row as u16).unwrap();
-
             let mut line_str = line.clone().to_string();
-            line_str.truncate(view_width);
+            let len = line_str.trim_end_matches(&['\r', '\n']).len();
+            line_str.truncate(std::cmp::min(self.view.width(), len));
 
-            self.terminal.write(&line_str).unwrap();
+            self.terminal
+                .put_cells(0, row, line_str, Color::Reset, Color::Reset);
         }
+        self.terminal.queue_draw().unwrap();
 
         let (x, y) = self.editor.cursor().get_position_as_tuple();
         self.terminal
@@ -108,18 +105,17 @@ impl Application {
     }
 
     fn resize(&mut self, w: u16, h: u16) {
-        self.view.resize(Size {
-            width: w,
-            height: h - 1, // Remove a line for statusline
-        });
+        let w = w as usize;
+        let h = h as usize;
+
+        self.terminal.resize(w, h);
+        self.view.resize(w, h);
     }
 
     pub async fn run(&mut self) -> Result<()> {
         self.terminal.setup()?;
 
-        // self.event_loop().await?;
-        //
-        self.render();
+        self.render().await;
         self.event_loop().await?;
 
         self.close()?;
